@@ -17,8 +17,7 @@ class TaskAdding(StatesGroup):
     title = State()
     description = State()
     extras = State()
-    link = State()
-    extra_text = State()
+    editing = State()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
@@ -39,37 +38,24 @@ async def task_title(message: Message, state: FSMContext):
 @router.message(TaskAdding.description)
 async def task_description(message: Message, state: FSMContext):
     await state.update_data(description=message.text)
-
     await state.set_state(TaskAdding.extras)
-    await message.answer(text="Добавим что-нибудь еще?", reply_markup=kb.task_adding_tools)
+    await message.answer(text="Все готово?", reply_markup=kb.task_adding_tools)
 
-@router.message(F.text == "📎Добавить ссылку")
-async def task_extras(message: Message, state: FSMContext):
-    await state.set_state(TaskAdding.link)
-    await message.answer(text="⬇️ Напиши ссылку ⬇️")
-
-@router.message(TaskAdding.link)
-async def task_link(message: Message, state: FSMContext):
+@router.message(F.text == "✏️Отредактировать", TaskAdding.extras)
+async def task_edit(message: Message, state: FSMContext):
     current_description = (await state.get_data()).get('description')
-    new_description = f'{current_description}\n\n<a href="{message.text}">{message.text}</a>'
+    await message.answer(text=f'Вот текущее описание (нужно скопировать и отправить заново):')
+    await message.answer(text=f'{current_description}')
+    await state.set_state(TaskAdding.editing)
+
+@router.message(TaskAdding.editing)
+async def task_editing(message: Message, state: FSMContext):
+    new_description = message.text
     await state.update_data(description=new_description)
-    await message.answer(text="Добавим что-нибудь еще?", reply_markup=kb.task_adding_tools)
     await state.set_state(TaskAdding.extras)
+    await message.answer('Новое описание принято!', reply_markup=kb.task_adding_tools)
 
-@router.message(F.text == "✏️Добавить текст")
-async def task_extras(message: Message, state: FSMContext):
-    await state.set_state(TaskAdding.extra_text)
-    await message.answer(text="⬇️ Напиши текст ⬇️")
-
-@router.message(TaskAdding.extra_text)
-async def task_extra_text(message: Message, state: FSMContext):
-    current_description = (await state.get_data()).get('description')
-    new_description = current_description + f'\n\n{message.text}'
-    await state.update_data(description=new_description)
-    await message.answer(text="Добавим что-нибудь еще?", reply_markup=kb.task_adding_tools)
-    await state.set_state(TaskAdding.extras)
-
-@router.message(F.text == "✉️Отправить задачу")
+@router.message(F.text == "✉️Отправить задачу", TaskAdding.extras)
 async def task_extras(message: Message, state: FSMContext):
     data = await state.get_data()
     user = await get_user_by_tg_id(message.from_user.id)

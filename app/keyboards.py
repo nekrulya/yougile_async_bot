@@ -7,6 +7,5 @@ main = ReplyKeyboardMarkup(keyboard=[
 ], resize_keyboard=True, one_time_keyboard=True)
 
 task_adding_tools = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="📎Добавить ссылку"), KeyboardButton(text="✏️Добавить текст")],
-    [KeyboardButton(text="✉️Отправить задачу")]
+    [KeyboardButton(text="✏️Отредактировать"), KeyboardButton(text="✉️Отправить задачу")],
 ], resize_keyboard=True, one_time_keyboard=True)
