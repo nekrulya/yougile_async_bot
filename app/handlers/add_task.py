@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback, get_user_locale
+from pathlib import Path
 import re
 
 import app.database.requests as rq
@@ -12,11 +13,13 @@ import app.services.yougile_api as yg
 
 import app.keyboards as kb
 from app.database.requests import get_user_by_tg_id
+from app.services.ImageSaver import ImageSaver
 
 from bot import bot
 from config import SAVE_PATH
 
 router = Router()
+image_saver = ImageSaver(bot)
 
 
 class TaskAdding(StatesGroup):
@@ -89,17 +92,14 @@ async def task_edit(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.image)
     await message.answer(text="⬇️Отправьте картинку⬇️")
 
-# @router.message(F.photo, TaskAdding.image)
-@router.message(F.photo)
+@router.message(F.photo, TaskAdding.image)
 async def task_image(message: Message, state: FSMContext):
     photo = message.photo[-1]
     file_info = await bot.get_file(photo.file_id)
-    file_path = file_info.file_path
-    downloaded_file = await bot.download_file(file_path)
-    file_name = f"{SAVE_PATH}{file_info.file_unique_id}.jpg"
-    with open(file_name, 'wb') as new_file:
-        new_file.write(downloaded_file.getvalue())
-    await message.reply(f"Фото сохранено как {file_name}")
+    current_data = await state.get_data()
+    current_data.get('images', []).append(file_info.file_unique_id)
+    await state.set_state(TaskAdding.extras)
+    await message.reply(f"Фото сохранено!", reply_markup=kb.task_adding_tools)
 
 @router.message(F.text == "✉️Отправить задачу", TaskAdding.extras)
 async def task_extras(message: Message, state: FSMContext):
@@ -118,6 +118,12 @@ async def task_extras(message: Message, state: FSMContext):
         description = description.replace(link, f'<a href="{link}">{link}</a>')
 
     description += f'\n<a href="https://t.me/{message.from_user.username}">@{message.from_user.username}</a>'
+
+    print('До загрузки картинок')
+
+    await image_saver.save_images((await state.get_data()).get('images', []), state=state)
+
+    print('После загрузки картинок')
 
     try:
         new_task_id = await yg.set_task(title=title,
