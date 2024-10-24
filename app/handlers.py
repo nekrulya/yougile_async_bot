@@ -1,8 +1,11 @@
+import json
+
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.state import State, StatesGroup
+import re
 
 import app.database.requests as rq
 
@@ -59,10 +62,16 @@ async def task_editing(message: Message, state: FSMContext):
 async def task_extras(message: Message, state: FSMContext):
     data = await state.get_data()
     user = await get_user_by_tg_id(message.from_user.id)
-    title, description = data['title'], data['description']
     column_id = await rq.get_column(user.id)
 
-    new_task_id = await yg.set_task(title=title, description=description, column_id=column_id)
+    title, description = data['title'], data['description']
+    link_pattern = r"https?://(?:www\.)?[^\s/$.?#].[^\s]*"
+    links = re.findall(link_pattern, description)
+    for link in links:
+        description = description.replace(link, f'<a href="{link}">{link}</a>')
+
+    new_task_id = await yg.set_task(title=title, description=description.replace('\n', '<br>'), column_id=column_id)
     await rq.set_task(user.id, title=title, description=description, task_id=new_task_id)
     await state.clear()
+    await message.answer(text=f'Задача "{title}" отправлена!', reply_markup=kb.main)
 
