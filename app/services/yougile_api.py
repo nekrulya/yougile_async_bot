@@ -15,11 +15,17 @@ HEADERS = {
     "Authorization": f"Bearer {API_KEY}"
 }
 
-async def set_task(title: str, description: str, column_id: str):
+async def set_task(title: str, description: str, column_id: str, deadline: int | None = None):
     data = {
         "title": title,
         "description": description,
         "columnId": column_id,
     }
+
+    if deadline:
+        data["deadline"] = {
+            "deadline": deadline
+        }
+
     response = requests.post(URLS.TASKS, headers=HEADERS, data=json.dumps(data))
     return response.json().get('id')
