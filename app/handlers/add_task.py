@@ -1,10 +1,9 @@
-import json
-
 from aiogram import F, Router
-from aiogram.filters import CommandStart, Command
+from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import State, StatesGroup
+from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback, get_user_locale
 import re
 
 import app.database.requests as rq
@@ -17,18 +16,22 @@ from app.database.requests import get_user_by_tg_id
 router = Router()
 
 class TaskAdding(StatesGroup):
+    topic = State()
     title = State()
     description = State()
     extras = State()
     editing = State()
+    deadline = State()
 
-@router.message(CommandStart())
-async def cmd_start(message: Message):
-    await rq.set_user(message.from_user.id)
-    await message.answer(f"hello {message.from_user.first_name}", reply_markup=kb.main)
 
 @router.message(F.text == "📝Добавить задачу")
 async def add_task(message: Message, state=FSMContext):
+    await state.set_state(TaskAdding.topic)
+    await message.answer("Введите тематику задачи:", reply_markup=kb.task_topics)
+
+@router.message(TaskAdding.topic)
+async def task_title(message: Message, state: FSMContext):
+    await state.update_data(topic=message.text)
     await state.set_state(TaskAdding.title)
     await message.answer("Введите название задачи:")
 
@@ -36,7 +39,7 @@ async def add_task(message: Message, state=FSMContext):
 async def task_title(message: Message, state: FSMContext):
     await state.update_data(title=message.text)
     await state.set_state(TaskAdding.description)
-    await message.answer("Введите описание задачи")
+    await message.answer("Введите описание задачи:")
 
 @router.message(TaskAdding.description)
 async def task_description(message: Message, state: FSMContext):
@@ -44,7 +47,7 @@ async def task_description(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.extras)
     await message.answer(text="Все готово?", reply_markup=kb.task_adding_tools)
 
-@router.message(F.text == "✏️Отредактировать", TaskAdding.extras)
+@router.message(F.text == "✏️Отредактировать описание", TaskAdding.extras)
 async def task_edit(message: Message, state: FSMContext):
     current_description = (await state.get_data()).get('description')
     await message.answer(text=f'Вот текущее описание (нужно скопировать и отправить заново):')
@@ -58,20 +61,40 @@ async def task_editing(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.extras)
     await message.answer('Новое описание принято!', reply_markup=kb.task_adding_tools)
 
+@router.message(F.text == "🕐Добавить дедлайн", TaskAdding.extras)
+async def task_edit(message: Message, state: FSMContext):
+    await message.answer(text=f'Выберите дату', reply_markup=await SimpleCalendar(locale='ru_RU').start_calendar())
+    await state.set_state(TaskAdding.deadline)
+
+@router.callback_query(TaskAdding.deadline, SimpleCalendarCallback.filter())
+async def task_deadline(callback_query: CallbackQuery, callback_data: CallbackData, state: FSMContext):
+    calendar = SimpleCalendar(
+        locale=await get_user_locale(callback_query.from_user), show_alerts=False
+    )
+    selected, date = await calendar.process_selection(callback_query, callback_data)
+    if selected:
+        await callback_query.message.answer(f'Дедлайн установлен: {date.strftime("%d.%m.%Y")}', reply_markup=kb.task_adding_tools)
+        await state.update_data(deadline=date.timestamp() * 1000 + 10 * 60 * 60 * 1000)
+        await state.set_state(TaskAdding.extras)
+
 @router.message(F.text == "✉️Отправить задачу", TaskAdding.extras)
 async def task_extras(message: Message, state: FSMContext):
     data = await state.get_data()
     user = await get_user_by_tg_id(message.from_user.id)
     column_id = await rq.get_column(user.id)
 
-    title, description = data['title'], data['description']
+    topic, title, description, deadline = data.get("topic"), data.get('title'), data.get('description'), data.get('deadline')
+
+    description = f"{topic}\n{description}"
+
     link_pattern = r"https?://(?:www\.)?[^\s/$.?#].[^\s]*"
     links = re.findall(link_pattern, description)
     for link in links:
         description = description.replace(link, f'<a href="{link}">{link}</a>')
 
-    new_task_id = await yg.set_task(title=title, description=description.replace('\n', '<br>'), column_id=column_id)
+    description += f'\n<a href="https://t.me/{message.from_user.username}">@{message.from_user.username}</a>'
+
+    new_task_id = await yg.set_task(title=title, description=description.replace('\n', '<br>'), column_id=column_id, deadline=deadline)
     await rq.set_task(user.id, title=title, description=description, task_id=new_task_id)
     await state.clear()
     await message.answer(text=f'Задача "{title}" отправлена!', reply_markup=kb.main)
-
