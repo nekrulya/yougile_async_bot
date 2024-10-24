@@ -13,7 +13,11 @@ import app.services.yougile_api as yg
 import app.keyboards as kb
 from app.database.requests import get_user_by_tg_id
 
+from bot import bot
+from config import SAVE_PATH
+
 router = Router()
+
 
 class TaskAdding(StatesGroup):
     topic = State()
@@ -22,6 +26,8 @@ class TaskAdding(StatesGroup):
     extras = State()
     editing = State()
     deadline = State()
+    image = State()
+    document = State()
 
 
 @router.message(F.text == "📝Добавить задачу")
@@ -73,9 +79,27 @@ async def task_deadline(callback_query: CallbackQuery, callback_data: CallbackDa
     )
     selected, date = await calendar.process_selection(callback_query, callback_data)
     if selected:
-        await callback_query.message.answer(f'Дедлайн установлен: {date.strftime("%d.%m.%Y")}', reply_markup=kb.task_adding_tools)
+        await callback_query.message.answer(f'Дедлайн установлен: {date.strftime("%d.%m.%Y")}',
+                                            reply_markup=kb.task_adding_tools)
         await state.update_data(deadline=date.timestamp() * 1000 + 10 * 60 * 60 * 1000)
         await state.set_state(TaskAdding.extras)
+
+@router.message(F.text == "🖼Прикрепить картинку", TaskAdding.extras)
+async def task_edit(message: Message, state: FSMContext):
+    await state.set_state(TaskAdding.image)
+    await message.answer(text="⬇️Отправьте картинку⬇️")
+
+# @router.message(F.photo, TaskAdding.image)
+@router.message(F.photo)
+async def task_image(message: Message, state: FSMContext):
+    photo = message.photo[-1]
+    file_info = await bot.get_file(photo.file_id)
+    file_path = file_info.file_path
+    downloaded_file = await bot.download_file(file_path)
+    file_name = f"{SAVE_PATH}{file_info.file_unique_id}.jpg"
+    with open(file_name, 'wb') as new_file:
+        new_file.write(downloaded_file.getvalue())
+    await message.reply(f"Фото сохранено как {file_name}")
 
 @router.message(F.text == "✉️Отправить задачу", TaskAdding.extras)
 async def task_extras(message: Message, state: FSMContext):
@@ -83,7 +107,8 @@ async def task_extras(message: Message, state: FSMContext):
     user = await get_user_by_tg_id(message.from_user.id)
     column_id = await rq.get_column(user.id)
 
-    topic, title, description, deadline = data.get("topic"), data.get('title'), data.get('description'), data.get('deadline')
+    topic, title, description, deadline = (data.get("topic"), data.get('title'),
+                                           data.get('description'), data.get('deadline'))
 
     description = f"{topic}\n{description}"
 
@@ -94,7 +119,13 @@ async def task_extras(message: Message, state: FSMContext):
 
     description += f'\n<a href="https://t.me/{message.from_user.username}">@{message.from_user.username}</a>'
 
-    new_task_id = await yg.set_task(title=title, description=description.replace('\n', '<br>'), column_id=column_id, deadline=deadline)
-    await rq.set_task(user.id, title=title, description=description, task_id=new_task_id)
+    try:
+        new_task_id = await yg.set_task(title=title,
+                                        description=description.replace('\n', '<br>'),
+                                        column_id=column_id,
+                                        deadline=deadline)
+        await rq.set_task(user.id, title=title, description=description, task_id=new_task_id)
+    except Exception as e:
+        await message.answer(text="При отправке задачи произошла ошибка")
     await state.clear()
     await message.answer(text=f'Задача "{title}" отправлена!', reply_markup=kb.main)
