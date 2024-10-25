@@ -96,8 +96,10 @@ async def task_edit(message: Message, state: FSMContext):
 async def task_image(message: Message, state: FSMContext):
     photo = message.photo[-1]
     file_info = await bot.get_file(photo.file_id)
+    file_path = file_info.file_path
     current_data = await state.get_data()
-    current_data.get('images', []).append(file_info.file_unique_id)
+    current_data.setdefault('images', []).append(file_path)
+    await state.update_data(current_data)
     await state.set_state(TaskAdding.extras)
     await message.reply(f"Фото сохранено!", reply_markup=kb.task_adding_tools)
 
@@ -107,10 +109,11 @@ async def task_extras(message: Message, state: FSMContext):
     user = await get_user_by_tg_id(message.from_user.id)
     column_id = await rq.get_column(user.id)
 
-    topic, title, description, deadline = (data.get("topic"), data.get('title'),
-                                           data.get('description'), data.get('deadline'))
+    topic, title, description, deadline, images = (data.get("topic"), data.get('title'),
+                                           data.get('description'), data.get('deadline'), data.get('images', []))
 
     description = f"{topic}\n{description}"
+
 
     link_pattern = r"https?://(?:www\.)?[^\s/$.?#].[^\s]*"
     links = re.findall(link_pattern, description)
@@ -119,11 +122,9 @@ async def task_extras(message: Message, state: FSMContext):
 
     description += f'\n<a href="https://t.me/{message.from_user.username}">@{message.from_user.username}</a>'
 
-    print('До загрузки картинок')
-
-    await image_saver.save_images((await state.get_data()).get('images', []), state=state)
-
-    print('После загрузки картинок')
+    if images:
+        images_folder = await image_saver.save_images((await state.get_data()).get('images', []), state=state)
+        # print(images_folder.resolve())
 
     try:
         new_task_id = await yg.set_task(title=title,
