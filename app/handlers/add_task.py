@@ -13,13 +13,13 @@ import app.services.yougile_api as yg
 
 import app.keyboards as kb
 from app.database.requests import get_user_by_tg_id
-from app.services.ImageSaver import ImageSaver
+from app.services.AttachmentSaver import AttachmentSaver
 
 from bot import bot
 from config import SAVE_PATH
 
 router = Router()
-image_saver = ImageSaver(bot)
+attachment_saver = AttachmentSaver(bot)
 
 
 class TaskAdding(StatesGroup):
@@ -48,7 +48,11 @@ async def task_title(message: Message, state: FSMContext):
 async def task_title(message: Message, state: FSMContext):
     await state.update_data(title=message.text)
     await state.set_state(TaskAdding.description)
-    await message.answer("Введите описание задачи:")
+    if (await state.get_data()).get('topic') == 'Проблемы в проекте':
+        await message.answer(
+            "Укажите:\n1. Проект\n2. Вид\n3. id элемента\n4. Дополнительное описание (уточнения, ссылки)")
+    else:
+        await message.answer("Введите описание задачи:")
 
 @router.message(TaskAdding.description)
 async def task_description(message: Message, state: FSMContext):
@@ -94,14 +98,36 @@ async def task_edit(message: Message, state: FSMContext):
 
 @router.message(F.photo, TaskAdding.image)
 async def task_image(message: Message, state: FSMContext):
-    photo = message.photo[-1]
-    file_info = await bot.get_file(photo.file_id)
+    image = message.photo[-1]
+    file_info = await bot.get_file(image.file_id)
     file_path = file_info.file_path
+
+    # запоминаем пути изображений
     current_data = await state.get_data()
-    current_data.setdefault('images', []).append(file_path)
+    current_data.setdefault('image_paths', []).append(file_path)
     await state.update_data(current_data)
+
     await state.set_state(TaskAdding.extras)
     await message.reply(f"Фото сохранено!", reply_markup=kb.task_adding_tools)
+
+@router.message(F.text == "📄Прикрепить документ", TaskAdding.extras)
+async def task_edit(message: Message, state: FSMContext):
+    await state.set_state(TaskAdding.document)
+    await message.answer(text="⬇️Отправьте документ⬇️")
+
+@router.message(F.document, TaskAdding.document)
+async def task_document(message: Message, state: FSMContext):
+    document = message.document
+    file_info = await bot.get_file(document.file_id)
+    file_path = file_info.file_path
+
+    # запоминаем пути документов
+    current_data = await state.get_data()
+    current_data.setdefault('document_paths', []).append(file_path)
+    await state.update_data(current_data)
+
+    await state.set_state(TaskAdding.extras)
+    await message.reply("Файл сохранен!", reply_markup=kb.task_adding_tools)
 
 @router.message(F.text == "✉️Отправить задачу", TaskAdding.extras)
 async def task_extras(message: Message, state: FSMContext):
@@ -112,25 +138,33 @@ async def task_extras(message: Message, state: FSMContext):
     topic, title, description, deadline, images = (data.get("topic"), data.get('title'),
                                            data.get('description'), data.get('deadline'), data.get('images', []))
 
+    # добавляем тему в начало описания
     description = f"{topic}\n{description}"
 
-
+    # форматируем ссылки
     link_pattern = r"https?://(?:www\.)?[^\s/$.?#].[^\s]*"
     links = re.findall(link_pattern, description)
     for link in links:
         description = description.replace(link, f'<a href="{link}">{link}</a>')
 
-    description += f'\n<a href="https://t.me/{message.from_user.username}">@{message.from_user.username}</a>'
+    # сохраняем изображения
+    attachment_folder = await attachment_saver.save(state)
+    if attachment_folder:
+        description += f"\n{attachment_folder}"
 
-    if images:
-        images_folder = await image_saver.save_images((await state.get_data()).get('images', []), state=state)
-        # print(images_folder.resolve())
+    # подписываем описание ником телеграма
+    if message.from_user.username:
+        description += f'\n<a href="https://t.me/{message.from_user.username}">@{message.from_user.username}</a>'
+    else:
+        description += f'\nTelegram: {message.from_user.first_name}'
 
     try:
+        # пытаемся добавить задачу в yougile
         new_task_id = await yg.set_task(title=title,
                                         description=description.replace('\n', '<br>'),
                                         column_id=column_id,
                                         deadline=deadline)
+        # запоминаем задачу в бд
         await rq.set_task(user.id, title=title, description=description, task_id=new_task_id)
     except Exception as e:
         await message.answer(text="При отправке задачи произошла ошибка")

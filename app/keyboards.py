@@ -3,12 +3,13 @@ from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton,
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 main = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="📝Добавить задачу"), KeyboardButton(text="📋Посмотреть активные")],
-    [KeyboardButton(text="✅Отметить выполненной"), KeyboardButton(text="✍️Редактировать")]
+    [KeyboardButton(text="📝Добавить задачу")]
 ], resize_keyboard=True, one_time_keyboard=True)
 
 task_topics = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="Разработка семейств "), KeyboardButton(text="Проблемы в проекте"), KeyboardButton(text="Дргуое")],
+    [KeyboardButton(text="Разработка семейств ")],
+    [KeyboardButton(text="Проблемы в проекте")],
+    [KeyboardButton(text="Другое")]
 ], resize_keyboard=True, one_time_keyboard=True)
 
 task_adding_tools = ReplyKeyboardMarkup(keyboard=[
