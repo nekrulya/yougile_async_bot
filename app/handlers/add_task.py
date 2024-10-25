@@ -60,7 +60,7 @@ async def task_description(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.extras)
     await message.answer(text="Все готово?", reply_markup=kb.task_adding_tools)
 
-@router.message(F.text == "✏️Отредактировать описание", TaskAdding.extras)
+@router.message(F.text == "✏️Редактировать описание", TaskAdding.extras)
 async def task_edit(message: Message, state: FSMContext):
     current_description = (await state.get_data()).get('description')
     await message.answer(text=f'Вот текущее описание (нужно скопировать и отправить заново):')
