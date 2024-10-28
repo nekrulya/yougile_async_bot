@@ -76,7 +76,9 @@ async def task_editing(message: Message, state: FSMContext):
 
 @router.message(F.text == "🕐Добавить дедлайн", TaskAdding.extras)
 async def task_edit(message: Message, state: FSMContext):
-    await message.answer(text=f'Выберите дату', reply_markup=await SimpleCalendar(locale='ru_RU').start_calendar())
+    await message.answer(
+        text=f'Выберите дату',
+        reply_markup=await SimpleCalendar(locale=await get_user_locale(message.from_user)).start_calendar())
     await state.set_state(TaskAdding.deadline)
 
 @router.callback_query(TaskAdding.deadline, SimpleCalendarCallback.filter())
