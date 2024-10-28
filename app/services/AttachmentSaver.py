@@ -24,48 +24,18 @@ class AttachmentSaver:
                 break
             folder_counter += 1
 
-        for index, document_path in enumerate(image_paths + document_paths):
+        for index, image_path in enumerate(image_paths):
+            downloaded_file = await self.bot.download_file(image_path)
+            file_extension = image_path.split(".")[-1]
+            file_name = f"{folder_path}/{title}_{index}.{file_extension}"
+            with open(file_name, 'wb') as new_file:
+                new_file.write(downloaded_file.getvalue())
+
+        for index, document in enumerate(document_paths):
+            document_path, document_file_name = document
             downloaded_file = await self.bot.download_file(document_path)
-            file_extension = document_path.split(".")[-1]
-            if document_path in document_paths:
-                file_name_without_folder = document_path.split("/")[-1]
-                file_name = f"{folder_path}/{file_name_without_folder}"
-            else:
-                file_name = f"{folder_path}/{title}_img_{index}.{file_extension}"
+            file_name = f"{folder_path}/{document_file_name}"
             with open(file_name, 'wb') as new_file:
                 new_file.write(downloaded_file.getvalue())
 
         return folder_path
-
-
-# class ImageSaver:
-#     def __init__(self, bot):
-#         self.bot = bot
-#
-#     async def save_images(self, photo_path_list, state):
-#         folder_path = None
-#         current_state = await state.get_data()
-#         topic, title, images = current_state.get('topic'), current_state.get('title'), current_state.get('images')
-#
-#         folder_counter = 1
-#         while True:
-#             folder_path = Path(f"{SAVE_PATH}/{topic}_{folder_counter}")
-#             if not folder_path.exists():
-#                 folder_path.mkdir(parents=True, exist_ok=True)
-#                 break
-#             folder_counter += 1
-#
-#         for index, photo_path in enumerate(photo_path_list, 1):
-#             downloaded_file = await self.bot.download_file(photo_path)
-#             file_name = f"{folder_path}/{title}_{index}.jpg"
-#             with open(file_name, 'wb') as new_file:
-#                 new_file.write(downloaded_file.getvalue())
-#
-#         return folder_path
-#
-#
-# class DocumentSaver:
-#     def __init__(self, bot):
-#         self.bot = bot
-#
-#     async def save(self, document_path_list, state):

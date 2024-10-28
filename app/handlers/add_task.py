@@ -4,7 +4,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback
-from pathlib import Path
 import re
 
 import app.database.requests as rq
@@ -16,7 +15,7 @@ from app.database.requests import get_user_by_tg_id
 from app.services.AttachmentSaver import AttachmentSaver
 
 from bot import bot
-from config import SAVE_PATH
+from config import CUSTOM_LOCALE
 
 router = Router()
 attachment_saver = AttachmentSaver(bot)
@@ -33,7 +32,7 @@ class TaskAdding(StatesGroup):
     document = State()
 
 async def get_user_locale(user):
-    return "ru-RU"
+    return CUSTOM_LOCALE
 
 
 @router.message(F.text == "📝Добавить задачу")
@@ -124,11 +123,12 @@ async def task_edit(message: Message, state: FSMContext):
 async def task_document(message: Message, state: FSMContext):
     document = message.document
     file_info = await bot.get_file(document.file_id)
+    file_name = document.file_name
     file_path = file_info.file_path
 
     # запоминаем пути документов
     current_data = await state.get_data()
-    current_data.setdefault('document_paths', []).append(file_path)
+    current_data.setdefault('document_paths', []).append((file_path, file_name))
     await state.update_data(current_data)
 
     await state.set_state(TaskAdding.extras)
