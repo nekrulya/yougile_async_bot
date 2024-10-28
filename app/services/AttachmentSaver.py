@@ -27,7 +27,10 @@ class AttachmentSaver:
         for index, document_path in enumerate(image_paths + document_paths):
             downloaded_file = await self.bot.download_file(document_path)
             file_extension = document_path.split(".")[-1]
-            file_name = f"{folder_path}/{title}_{index}.{file_extension}"
+            if document_path in document_paths:
+                file_name = f"{folder_path}/{document_path}"
+            else:
+                file_name = f"{folder_path}/{title}_img_{index}.{file_extension}"
             with open(file_name, 'wb') as new_file:
                 new_file.write(downloaded_file.getvalue())
 
