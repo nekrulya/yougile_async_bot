@@ -3,7 +3,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import State, StatesGroup
-from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback, get_user_locale
+from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback
 from pathlib import Path
 import re
 
@@ -31,6 +31,9 @@ class TaskAdding(StatesGroup):
     deadline = State()
     image = State()
     document = State()
+
+async def get_user_locale(user):
+    return "ru-RU"
 
 
 @router.message(F.text == "📝Добавить задачу")
