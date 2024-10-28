@@ -160,8 +160,12 @@ async def task_extras(message: Message, state: FSMContext):
     # подписываем описание ником телеграма
     if message.from_user.username:
         description += f'\n<a href="https://t.me/{message.from_user.username}">@{message.from_user.username}</a>'
-    else:
+    elif message.from_user.first_name and message.from_user.last_name:
+        description += f'\nTelegram: {message.from_user.first_name} {message.from_user.last_name}'
+    elif message.from_user.first_name:
         description += f'\nTelegram: {message.from_user.first_name}'
+    else:
+        description += f'\nTelegram: anonim'
 
     try:
         # пытаемся добавить задачу в yougile
