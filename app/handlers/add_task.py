@@ -52,7 +52,7 @@ async def task_title(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.description)
     if (await state.get_data()).get('topic') == 'Проблемы в проекте':
         await message.answer(
-            "Укажите:\n1. Проект\n2. Вид\n3. id элемента\n4. Дополнительное описание (уточнения, ссылки)")
+            "Укажите:\n1. Проект\n2. Вид/Лист\n3. id элемента\n4. Дополнительное описание (уточнения, ссылки)")
     else:
         await message.answer("Введите описание задачи:")
 
