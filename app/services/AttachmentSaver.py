@@ -31,7 +31,7 @@ class AttachmentSaver:
             with open(file_name, 'wb') as new_file:
                 new_file.write(downloaded_file.getvalue())
 
-        return Path(folder_path).resolve() if folder_path else None
+        return folder_path
 
 
 # class ImageSaver:
