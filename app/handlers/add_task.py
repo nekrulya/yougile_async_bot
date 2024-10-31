@@ -5,6 +5,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import State, StatesGroup
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback
 import re
+import logging
 
 import app.database.requests as rq
 
@@ -15,10 +16,14 @@ from app.database.requests import get_user_by_tg_id
 from app.services.AttachmentSaver import AttachmentSaver
 
 from bot import bot
-from config import CUSTOM_LOCALE
+from config import *
 
 router = Router()
 attachment_saver = AttachmentSaver(bot)
+logging.basicConfig(
+    level=logging.INFO,  # Уровень логирования
+    format="%(asctime)s [%(levelname)s] %(message)s",  # Формат сообщения
+)
 
 
 class TaskAdding(StatesGroup):
@@ -175,7 +180,28 @@ async def task_extras(message: Message, state: FSMContext):
                                         deadline=deadline)
         # запоминаем задачу в бд
         await rq.set_task(user.id, title=title, description=description, task_id=new_task_id)
+
+        logging.info(f"Добавлена задача: {user.id=}, {title=}, {description=}")
+
+
+
+        await state.clear()
+        await message.answer(text=f'Задача "{title}" отправлена!', reply_markup=kb.main)
+
     except Exception as e:
         await message.answer(text="При отправке задачи произошла ошибка")
-    await state.clear()
-    await message.answer(text=f'Задача "{title}" отправлена!', reply_markup=kb.main)
+        logging.warning(f"Ошибка при добавлении задача: {user.id=}, {title=}, {description=}\n{e=}")
+
+    try:
+        for admin_id in ADMIN_TELEGRAM_IDS:
+            if admin_id:
+                if message.from_user.username:
+                    await bot.send_message(
+                        chat_id=admin_id,
+                        text=f"Новая задача от {message.from_user.username}\nТема: {topic}\nНазвание: {title}")
+                else:
+                    await bot.send_message(
+                        chat_id=admin_id,
+                        text=f"Новая задача от {message.from_user.first_name}\nТема: {topic}\nНазвание: {title}")
+    except Exception as e:
+        logging.warning(f"Произошла ошибка при отправке уведомления {e=}")
