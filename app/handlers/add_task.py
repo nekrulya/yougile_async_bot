@@ -45,13 +45,20 @@ async def add_task(message: Message, state=FSMContext):
     await state.set_state(TaskAdding.topic)
     await message.answer("Введите тематику задачи:", reply_markup=kb.task_topics)
 
-@router.message(TaskAdding.topic)
+
+@router.message(F.text, TaskAdding.topic)
 async def task_title(message: Message, state: FSMContext):
     await state.update_data(topic=message.text)
     await state.set_state(TaskAdding.title)
     await message.answer("Введите название задачи:")
 
-@router.message(TaskAdding.title)
+
+@router.message(TaskAdding.topic)
+async def task_title(message: Message, state: FSMContext):
+    await message.answer("Введите тематику задачи текстом!")
+
+
+@router.message(F.text, TaskAdding.title)
 async def task_title(message: Message, state: FSMContext):
     await state.update_data(title=message.text)
     await state.set_state(TaskAdding.description)
@@ -61,11 +68,23 @@ async def task_title(message: Message, state: FSMContext):
     else:
         await message.answer("Введите описание задачи:")
 
-@router.message(TaskAdding.description)
+
+@router.message(TaskAdding.title)
+async def task_title(message: Message, state: FSMContext):
+    await message.answer("Введите название задачи текстом!")
+
+
+@router.message(F.text, TaskAdding.description)
 async def task_description(message: Message, state: FSMContext):
     await state.update_data(description=message.text)
     await state.set_state(TaskAdding.extras)
     await message.answer(text="Все готово?", reply_markup=kb.task_adding_tools)
+
+
+@router.message(TaskAdding.description)
+async def task_description(message: Message, state: FSMContext):
+    await message.answer(text="Введите описание текстом!")
+
 
 @router.message(F.text == "✏️Редактировать описание", TaskAdding.extras)
 async def task_edit(message: Message, state: FSMContext):
@@ -74,12 +93,19 @@ async def task_edit(message: Message, state: FSMContext):
     await message.answer(text=f'{current_description}')
     await state.set_state(TaskAdding.editing)
 
-@router.message(TaskAdding.editing)
+
+@router.message(F.text, TaskAdding.editing)
 async def task_editing(message: Message, state: FSMContext):
     new_description = message.text
     await state.update_data(description=new_description)
     await state.set_state(TaskAdding.extras)
     await message.answer('Новое описание принято!', reply_markup=kb.task_adding_tools)
+
+
+@router.message(TaskAdding.editing)
+async def task_editing(message: Message, state: FSMContext):
+    await message.answer('Введите описание текстом!')
+
 
 @router.message(F.text == "🕐Добавить дедлайн", TaskAdding.extras)
 async def task_edit(message: Message, state: FSMContext):
@@ -87,6 +113,7 @@ async def task_edit(message: Message, state: FSMContext):
         text=f'Выберите дату',
         reply_markup=await SimpleCalendar(locale=await get_user_locale(message.from_user)).start_calendar())
     await state.set_state(TaskAdding.deadline)
+
 
 @router.callback_query(TaskAdding.deadline, SimpleCalendarCallback.filter())
 async def task_deadline(callback_query: CallbackQuery, callback_data: CallbackData, state: FSMContext):
@@ -100,10 +127,19 @@ async def task_deadline(callback_query: CallbackQuery, callback_data: CallbackDa
         await state.update_data(deadline=date.timestamp() * 1000 + 10 * 60 * 60 * 1000)
         await state.set_state(TaskAdding.extras)
 
+
+@router.message(TaskAdding.deadline)
+async def task_deadline(message: Message, state: FSMContext):
+    await message.answer(
+        text=f'Нажимайте кнопочки!',
+        reply_markup=await SimpleCalendar(locale=await get_user_locale(message.from_user)).start_calendar())
+
+
 @router.message(F.text == "🖼Прикрепить картинку", TaskAdding.extras)
 async def task_edit(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.image)
     await message.answer(text="⬇️Отправьте картинку⬇️")
+
 
 @router.message(F.photo, TaskAdding.image)
 async def task_image(message: Message, state: FSMContext):
@@ -119,10 +155,17 @@ async def task_image(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.extras)
     await message.reply(f"Фото сохранено!", reply_markup=kb.task_adding_tools)
 
+
+@router.message(TaskAdding.image)
+async def task_image(message: Message, state: FSMContext):
+    await message.reply(f"Отправьте изображение!", reply_markup=kb.task_adding_tools)
+
+
 @router.message(F.text == "📄Прикрепить документ", TaskAdding.extras)
 async def task_edit(message: Message, state: FSMContext):
     await state.set_state(TaskAdding.document)
     await message.answer(text="⬇️Отправьте документ⬇️")
+
 
 @router.message(F.document, TaskAdding.document)
 async def task_document(message: Message, state: FSMContext):
@@ -138,6 +181,12 @@ async def task_document(message: Message, state: FSMContext):
 
     await state.set_state(TaskAdding.extras)
     await message.reply("Файл сохранен!", reply_markup=kb.task_adding_tools)
+
+
+@router.message(TaskAdding.document)
+async def task_document(message: Message, state: FSMContext):
+    await message.reply("Отправьте файл!", reply_markup=kb.task_adding_tools)
+
 
 @router.message(F.text == "✉️Отправить задачу", TaskAdding.extras)
 async def task_extras(message: Message, state: FSMContext):
@@ -205,3 +254,8 @@ async def task_extras(message: Message, state: FSMContext):
                         text=f"Новая задача от {message.from_user.first_name}\nТема: {topic}\nНазвание: {title}")
     except Exception as e:
         logging.warning(f"Произошла ошибка при отправке уведомления {e=}")
+
+
+@router.message()
+async def add_task(message: Message, state=FSMContext):
+    await message.answer("Неизвестное сообщение!", reply_markup=kb.main)
