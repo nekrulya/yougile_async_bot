@@ -18,6 +18,10 @@ task_adding_tools = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="✉️Отправить задачу")],
 ], resize_keyboard=True, one_time_keyboard=True)
 
+task_back = ReplyKeyboardMarkup(keyboard=[
+    [KeyboardButton(text="↩️Назад")]
+], resize_keyboard=True, one_time_keyboard=True)
+
 async def task_list(tasks: list):
     keyboard = InlineKeyboardBuilder()
     for task in tasks:
