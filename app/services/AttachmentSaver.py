@@ -17,6 +17,7 @@ class AttachmentSaver:
                                                      state_data.get("document_paths", []))
 
         folder_counter = 1
+        # если есть картинки или документы - создаем папку для их сохранения
         while image_paths + document_paths:
             folder_path = Path(f"{SAVE_PATH}/{topic}_{folder_counter}")
             if not folder_path.exists():
@@ -24,6 +25,7 @@ class AttachmentSaver:
                 break
             folder_counter += 1
 
+        # сохраняек картинки
         for index, image_path in enumerate(image_paths):
             downloaded_file = await self.bot.download_file(image_path)
             file_extension = image_path.split(".")[-1]
@@ -31,6 +33,7 @@ class AttachmentSaver:
             with open(file_name, 'wb') as new_file:
                 new_file.write(downloaded_file.getvalue())
 
+        # сохраняем файлы
         for index, document in enumerate(document_paths):
             document_path, document_file_name = document
             downloaded_file = await self.bot.download_file(document_path)
