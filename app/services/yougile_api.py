@@ -28,4 +28,5 @@ async def set_task(title: str, description: str, column_id: str, deadline: int |
         }
 
     response = requests.post(URLS.TASKS, headers=HEADERS, data=json.dumps(data))
+
     return response.json().get('id')
